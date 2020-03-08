@@ -1,0 +1,13 @@
+##
+ #  Worg
+ ##
+
+string_list = ["bau-bau", "bobocel", "14 pisici", "1pitic", "pisicel", "botosel", "414", "ham", "-hau", "bob", "bocceluta"]
+dictionary = {}
+
+dictionary[(1, 4)] = "mic"
+dictionary[(4, 8)] = "mediu"
+dictionary[(8, 15)] = "mare"
+
+if 'b' in string_list[0]:
+    print("Yes!")
