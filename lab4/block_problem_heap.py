@@ -3,7 +3,6 @@
  ##
 import sys
 import copy
-from time import time
 from queue import PriorityQueue
 
 class NodeInGraph:
@@ -147,14 +146,9 @@ def astar_search(graph: Graph):
     return None
 
 
-if __name__ == "__main__":
-    t0 = time()
-    start_config = [["a"], ["b", "c"], ["d"]]
-    end_config = [["c", "b"], [], ["a", "d"]]
-    graph = Graph(start_config, end_config)
+start_config = [["a"], ["b", "c"], ["d"]]
+end_config = [["c", "b"], [], ["a", "d"]]
+graph = Graph(start_config, end_config)
 
-    result = astar_search(graph)
-    print(result)
-
-    t1 = time()
-    print("Execution took " + str(round(1000 * (t1 - t0), 2)) + " ms.")
+result = astar_search(graph)
+print(result)
