@@ -41,11 +41,11 @@ class NodeInGraph:
         heuristic_value = 0
 
         if self.state[0] == 0:  #  We're on the left side
-            heuristic_value = 2 * (self.state[1] + self.state[2]) / BOAT_SIZE
+            heuristic_value = (self.state[1] + self.state[2]) / BOAT_SIZE
         else:
             x = TOTAL_NO_MISSIONARIES - self.state[1]
             y = TOTAL_NO_CANNIBALS - self.state[2]
-            heuristic_value = 2 * (x + y) / BOAT_SIZE + 1
+            heuristic_value = (x + y) / BOAT_SIZE + 1
 
         return heuristic_value
 
