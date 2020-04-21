@@ -8,6 +8,10 @@ import time
 class Board:
     min_player = None
     max_player = None
+    combos = [[(0, 0), (1, 1), (2, 2)], [(0, 2), (1, 1), (2, 0)], [(0, 0), (0, 1), (0, 2)],
+              [(1, 0), (1, 1), (1, 2)], [(2, 0), (2, 1), (2, 2)], [(0, 0), (1, 0), (2, 0)],
+              [(0, 1), (1, 1), (2, 1)], [(0, 2), (1, 2), (2, 2)]]
+
 
     def __init__(self, board = None):
         if board is None:
@@ -40,24 +44,42 @@ class Board:
 
     def winning_combo(self, ch):
         """ Check if there is a winning combo with character ch (X or O) """
-        if self.board[0][0] == ch and self.board[1][1] == ch and self.board[2][2] == ch:
-            return True
-        if self.board[0][2] == ch and self.board[1][1] == ch and self.board[2][0] == ch:
-            return True
-        if self.board[0][0] == ch and self.board[0][1] == ch and self.board[0][2] == ch:
-            return True
-        if self.board[1][0] == ch and self.board[1][1] == ch and self.board[1][2] == ch:
-            return True
-        if self.board[2][0] == ch and self.board[2][1] == ch and self.board[2][2] == ch:
-            return True
-        if self.board[0][0] == ch and self.board[1][0] == ch and self.board[2][0] == ch:
-            return True
-        if self.board[0][1] == ch and self.board[1][1] == ch and self.board[2][1] == ch:
-            return True
-        if self.board[0][2] == ch and self.board[1][2] == ch and self.board[2][2] == ch:
-            return True
-        return False
+        for x, y, z in Board.combos:
+            if self.board[x[0]][x[1]] == ch and self.board[y[0]][y[1]] == ch and self.board[z[0]][z[1]] == ch:
+                return True
 
+
+    def compute_free_combos(self, ch):
+        '''  Return the number of combos which we could potentially score '''
+        ones = 0
+        twos = 0
+        for x, y, z in Board.combos:
+            score = 0
+            if self.board[x[0]][x[1]] == ch:
+                score += 1
+            elif self.board[x[0]][x[1]] == ' ':
+                score -= 3
+
+            if self.board[y[0]][y[1]] == ch:
+                score += 1
+            elif self.board[y[0]][y[1]] == ' ':
+                score -= 3
+
+            if self.board[z[0]][z[1]] == ch:
+                score += 1
+            elif self.board[z[0]][z[1]] == ' ':
+                score -= 3
+
+            if score == 1:
+                ones += 1
+            elif score == 2:
+                twos += 1
+        return ones, twos
+
+
+    def compute_heuristic(self, ch):
+        ones, twos = self.compute_free_combos(ch)
+        return ones + 2 * twos
 
 
 def next_turn(turn):
@@ -74,6 +96,8 @@ def generate_next_states(board : Board, turn):
                 new_board = Board(copy.deepcopy(board.board))
                 new_board.board[i][j] = turn
                 state_list.append(new_board)
+
+    state_list.sort(key = lambda x : x.compute_heuristic(turn))
     return state_list
 
 
@@ -129,13 +153,16 @@ def play_game(algo_type, player_character):
             col = None
             print("Let's see what tricks you have up your sleeve. Pick your next move. Bear in mind that the coordinates are 0-indexed")
             while True:
-                row = int(input('Line = '))
-                col = int(input('Column = '))
+                try:
+                    row = int(input('Line = '))
+                    col = int(input('Column = '))
 
-                if (row in range(0, 3)) and (col in range(0, 3)) and (board.valid_position(row, col)):
-                    board.board[row][col] = player_character
-                    break
-                else:
+                    if (row in range(0, 3)) and (col in range(0, 3)) and (board.valid_position(row, col)):
+                        board.board[row][col] = player_character
+                        break
+                    else:
+                        print('Invalid row or column. Try again.')
+                except Exception as e:
                     print('Invalid row or column. Try again.')
 
             print('Nice move! The board looks like this:')
