@@ -9,6 +9,15 @@ def id(row, column):
 
 class Board:
     directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+    weight = [ 4, -3,  2,  2,  2,  2, -3,  4,
+              -3, -4, -1, -1, -1, -1, -4, -3,
+               2, -1,  1,  0,  0,  1, -1,  2,
+               2, -1,  0,  1,  1,  0, -1,  2,
+               2, -1,  0,  1,  1,  0, -1,  2,
+               2, -1,  1,  0,  0,  1, -1,  2,
+              -3, -4, -1, -1, -1, -1, -4, -3,
+               4, -3,  2,  2,  2,  2, -3,  4]
+
 
     def __init__(self, state = None):
         if state is None:
@@ -76,26 +85,110 @@ def check_move(board : Board, turn, i, j):
 
     if board.state[id(i, j)] == '#':
         index = 0
-            for dx, dy in Board.directions:
-                for steps in range(8):
-                    x = i + (steps + 1) * dx
-                    y = j + (steps + 1) * dy
-                    if x < 0 or x > 7 or y < 0 or y > 7 or board.state[id(x, y)] == '#':
-                        captured[index] = 0
-                        break
-                    elif board.state[id(x, y)] == next_turn(turn):
-                        captured[index] += 1
-                    elif board.state[id(x, y)] == turn:
-                        break
-                total_captured += captured[index]
-                index += 1
+        for dx, dy in Board.directions:
+            for steps in range(8):
+                x = i + (steps + 1) * dx
+                y = j + (steps + 1) * dy
+                if x < 0 or x > 7 or y < 0 or y > 7 or board.state[id(x, y)] == '#':
+                    captured[index] = 0
+                    break
+                elif board.state[id(x, y)] == next_turn(turn):
+                    captured[index] += 1
+                elif board.state[id(x, y)] == turn:
+                    break
+            total_captured += captured[index]
+            index += 1
     return total_captured, captured
+
+
+'''  This heuristic computes the degree of mobility the players have and scales it to the [-10, 10] interval '''
+def heuristic_mobility(board : Board, turn):
+    a = 0  #  The number of moves the current player can make
+    b = 0  #  The number of moves the other player can make
+    for i in range(8):
+        for j in range(8):
+            captured, total_captured = check_move(board, turn, i, j)
+            if captured > 0:
+                a += 1
+
+            captured, total_captured = check_move(board, next_turn(turn), i, j)
+            if captured > 0:
+                b += 1
+
+    #  The board is not in a final state, so a + b > 0
+    return 10 * (a - b) / (a + b)
+
+
+'''  Score the number of corners occupied by each player - scale it to [-10, 10] '''
+def heuristic_corners(board : Board, turn):
+    a = 0
+    b = 0
+    if board.state[id(0, 0)] == turn:
+        a += 2.5
+    elif board.state[id(0, 0)] == next_turn(turn):
+        b += 2.5
+
+    if board.state[id(0, 7)] == turn:
+        a += 2.5
+    elif board.state[id(0, 7)] == next_turn(turn):
+        b += 2.5
+
+    if board.state[id(7, 0)] == turn:
+        a += 2.5
+    elif board.state[id(7, 0)] == next_turn(turn):
+        b += 2.5
+
+    if board.state[id (7, 7)] == turn:
+        a += 2.5
+    elif board.state[id(7, 0)] == next_turn(turn):
+        b += 2.5
+
+    return a - b
+
+
+'''  Score the number of weights gained by each player '''
+def heuristic_static_weights(board : Board, turn):
+    a = 0
+    b = 0
+    for i in range(8):
+        for j in range(8):
+            if board.state[id(i, j)] == turn:
+                a += Board.weight[id(i, j)]
+            elif board.state[id(i, j)] == next_turn(turn):
+                b += Board.weight[id(i, j)]
+
+    return a - b
+
+
+'''  Give weights to the previous heuristics  and return the final result '''
+def combine_heuristics(board : Board, turn):
+    #  If the next player can't make his move, the state is final so we return the outcome instead of the heuristic value
+    if is_final_configuration(board, next_turn(turn)):
+        black, white = board.get_scores()
+        if black == white:
+            return 0
+        elif black > white:
+            if turn == 'n':
+                return INF
+            else:
+                return -INF
+        else:
+            if turn == 'w':
+                return INF
+            else:
+                return -INF
+
+    a = heuristic_corners(board, turn)
+    b = heuristic_mobility(board, turn)
+    c = heuristic_static_weights(board, turn)
+
+    return 1.0 * c + 10 * b + 6 * a
 
 
 '''  Generate move - it was checked before '''
 def make_move(board : Board, captured, i, j, turn):
     curr_state = copy.deepcopy(board.state)
-    cur_state[id(i, j)] = turn
+    curr_state[id(i, j)] = turn
     index = 0
     for dx, dy in Board.directions:
         for steps in range(captured[index]):
@@ -118,6 +211,10 @@ def generate_next_states(board : Board, turn, sort = False):
                 #  If the we capture at least one unit, the move is valid
                 if total_captured > 0:
                     new_state_list.append(make_move(board, captured, i, j, turn))
+
+    if sort is True:  #  Sort the next moves by heuristic value in decreasing order
+        new_state_list.sort(key = lambda x : -combine_heuristics(x, turn))
+
     return new_state_list
 
 
@@ -125,7 +222,7 @@ def generate_next_states(board : Board, turn, sort = False):
 def is_final_configuration(board : Board, turn):
     next_states = generate_next_states(board, turn)
     if len(next_states) == 0:
-        return True:
+        return True
     return False
 
 
@@ -134,19 +231,18 @@ def minimax(board : Board, depth, maximizing_player, turn):
     next_states = generate_next_states(board, turn)
 
     if len(next_states) == 0 or depth == 0:
-        #  The current board state is final
-        pass  #  TODO - return the heuristic value
+        return (combine_heuristics(board, turn), None)
 
     value = 0
     best_move = None
     if maximizing_player:
-        value = -INF
+        value = -INF * 2
         for next_state in next_states:
             result = minimax(next_state, depth - 1, not maximizing_player, next_turn(turn))
             if value < result[0]:
                 value, best_move = result[0], next_state
     else:
-        value = INF
+        value = INF * 2
         for next_state in next_states:
             result = minimax(next_state, depth - 1, not maximizing_player, next_turn(turn))
             if value > result[0]:
@@ -157,18 +253,17 @@ def minimax(board : Board, depth, maximizing_player, turn):
 
 '''  AlphaBeta algorithm '''
 def alphabeta(board : Board, depth, alpha, beta, maximizing_player, turn):
-    next_states = generate_next_states(board, turn)
+    next_states = generate_next_states(board, turn, sort = True)
 
     if len(next_states) == 0 or depth == 0:
-        #  The current board state is final
-        pass  #  TODO - return the heuristic value
+        return (combine_heuristics(board, turn), None)
 
     value = 0
     best_move = None
     if maximizing_player:
         value = -INF
         for next_state in next_states:
-            result = alphabeta(next_state, depth - 1, alpha, beta, not maximizing_player, turn)
+            result = alphabeta(next_state, depth - 1, alpha, beta, not maximizing_player, next_turn(turn))
             if result[0] > value:
                 value, best_move = result[0], next_state
             alpha = max(alpha, result[0])
@@ -177,7 +272,7 @@ def alphabeta(board : Board, depth, alpha, beta, maximizing_player, turn):
     else:
         value = INF
         for next_state in next_states:
-            result = alphabeta(next_state, depth - 1, alpha, beta, not maximizing_player, turn)
+            result = alphabeta(next_state, depth - 1, alpha, beta, not maximizing_player, next_turn(turn))
             if result[0] < value:
                 value, best_move = result[0], next_state
             beta = min(beta, result[0])
@@ -191,13 +286,16 @@ def get_next_state(board, algo_type, depth, turn):
     if algo_type == 1:
         return minimax(board, depth, True, turn)[1]
     else:
-        return alphabeta(board, depth, -INF, +INF, True, turn)
+        return alphabeta(board, depth, -INF, +INF, True, turn)[1]
 
 
 '''  Core game function '''
 def play_game(algo_type, depth, player_character):
     board = Board()
     turn = 'n'
+
+    print('Game started! Initial board:')
+    print(board)
 
     while is_final_configuration(board, turn) is False:
         #  Let the player make his move
@@ -241,15 +339,18 @@ def play_game(algo_type, depth, player_character):
                 except Exception as e:
                     print('Invalid row or column. Try again.')
 
-            print('Nive move! THe board looks like this:')
+            print('Nive move! The board looks like this:')
             print(board)
         #  Let the AI show his skils
         else:
             t0 = time.time()
             board = get_next_state(board, algo_type, depth, turn)
             t1 = time.time()
-            print('The computer made his move in ' + str(int(1000 * (t1 = t0))) + ' ms. Current state:')
+            print('The computer made his move in ' + str(int(1000 * (t1 - t0))) + ' ms. Current state:')
             print(board)
+
+        black, white = board.get_scores()
+        print('Score: black ' + str(black) + ' white ' + str(white))
         turn = next_turn(turn)
 
     #  Time to give the verdict
@@ -285,28 +386,28 @@ def main():
     algo_type = int(algo_type)
     player_character = None
     while True:
-        player_character = input('Choose the character that you want to play with. Keep in mind that black always starts. Press 1 or 2.\n1. Black (n)\n2. White (a)')
+        player_character = input('Choose the character that you want to play with. Keep in mind that black always starts. Press 1 or 2.\n1. Black (n)\n2. White (a)\n')
 
         if player_character == '1':
             player_character = 'n'
             break
         elif player_character == '2':
-            player_score = 'a'
+            player_character = 'a'
             break
         else:
             print('Wrong pick. Try again.')
 
     depth = None
     while True:
-        difficulty = input('Choose difficulty. Press 1, 2 or 3.\n1. Easy\n2. Medium\n3. Hard')
+        difficulty = input('Choose difficulty. Press 1, 2 or 3.\n1. Easy\n2. Medium\n3. Hard\n')
 
-        if player_character == '1':
+        if difficulty == '1':
             depth = 2
             break
-        elif player_character == '2':
+        elif difficulty == '2':
             depth = 4
             break
-        elif player_character == '3':
+        elif difficulty == '3':
             depth = 6
             break
         else:
