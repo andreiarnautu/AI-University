@@ -29,6 +29,7 @@ class Board:
         else:
             self.state = state
 
+
     def get_scores(self):
         black = 0
         white = 0
@@ -121,8 +122,8 @@ def heuristic_mobility(board : Board, turn):
 
 '''  Score the number of corners occupied by each player - scale it to [-10, 10] '''
 def heuristic_corners(board : Board, turn):
-    a = 0
-    b = 0
+    a = 0  #  first player's corner score
+    b = 0  #  second player's corner score
     if board.state[id(0, 0)] == turn:
         a += 2.5
     elif board.state[id(0, 0)] == next_turn(turn):
@@ -140,7 +141,7 @@ def heuristic_corners(board : Board, turn):
 
     if board.state[id (7, 7)] == turn:
         a += 2.5
-    elif board.state[id(7, 0)] == next_turn(turn):
+    elif board.state[id(7, 7)] == next_turn(turn):
         b += 2.5
 
     return a - b
@@ -162,7 +163,8 @@ def heuristic_static_weights(board : Board, turn):
 
 '''  Give weights to the previous heuristics  and return the final result '''
 def combine_heuristics(board : Board, turn):
-    #  If the next player can't make his move, the state is final so we return the outcome instead of the heuristic value
+    #  If no player can make any move, the state is final so we return the outcome instead of the heuristic value
+    #  The finality of the state means it has more importance than any heuristic approximation, so its value has to be significantly bigger, therefore the need to use INF or -INF when we talk about final winning/losing states.
     if is_final_configuration(board, next_turn(turn)):
         black, white = board.get_scores()
         if black == white:
@@ -178,11 +180,12 @@ def combine_heuristics(board : Board, turn):
             else:
                 return -INF
 
+    #  Otherwise, we combine the 3 heuristic
     a = heuristic_corners(board, turn)
     b = heuristic_mobility(board, turn)
     c = heuristic_static_weights(board, turn)
 
-    return 1.0 * c + 10 * b + 6 * a
+    return 1.0 * c + 3 * b + 6 * a
 
 
 '''  Generate move - it was checked before '''
@@ -220,8 +223,10 @@ def generate_next_states(board : Board, turn, sort = False):
 
 '''  Functions that checks whether a given configuration is final or not '''
 def is_final_configuration(board : Board, turn):
-    next_states = generate_next_states(board, turn)
-    if len(next_states) == 0:
+    next_states_1 = generate_next_states(board, turn)
+    next_states_2 = generate_next_states(board, next_turn(turn))
+
+    if len(next_states_1) == 0 and len(next_states_2) == 0:
         return True
     return False
 
@@ -230,8 +235,14 @@ def is_final_configuration(board : Board, turn):
 def minimax(board : Board, depth, maximizing_player, turn):
     next_states = generate_next_states(board, turn)
 
-    if len(next_states) == 0 or depth == 0:
+    #  Check if the recursion has to end
+    if is_final_configuration(board, turn) or depth == 0:
         return (combine_heuristics(board, turn), None)
+
+    #  Check if we have to switch to the next player
+    if len(next_states) == 0:
+        return minimax(board, depth - 1, not maximizing_player, next_turn(turn))
+
 
     value = 0
     best_move = None
@@ -255,13 +266,18 @@ def minimax(board : Board, depth, maximizing_player, turn):
 def alphabeta(board : Board, depth, alpha, beta, maximizing_player, turn):
     next_states = generate_next_states(board, turn, sort = True)
 
-    if len(next_states) == 0 or depth == 0:
+    #  Check if the recursion has to end
+    if is_final_configuration(board, turn) or depth == 0:
         return (combine_heuristics(board, turn), None)
+
+    #  Check if we have to switch to the next player
+    if len(next_states) == 0:
+        return alphabeta(board, depth - 1, alpha, beta, not maximizing_player, next_turn(turn))
 
     value = 0
     best_move = None
     if maximizing_player:
-        value = -INF
+        value = -INF * 2
         for next_state in next_states:
             result = alphabeta(next_state, depth - 1, alpha, beta, not maximizing_player, next_turn(turn))
             if result[0] > value:
@@ -270,7 +286,7 @@ def alphabeta(board : Board, depth, alpha, beta, maximizing_player, turn):
             if alpha >= beta:
                 break
     else:
-        value = INF
+        value = INF * 2
         for next_state in next_states:
             result = alphabeta(next_state, depth - 1, alpha, beta, not maximizing_player, next_turn(turn))
             if result[0] < value:
@@ -300,6 +316,13 @@ def play_game(algo_type, depth, player_character):
     while is_final_configuration(board, turn) is False:
         #  Let the player make his move
         if turn == player_character:
+            #  Check if the player has any valid moves to make
+            next_states = generate_next_states(board, turn)
+            if len(next_states) == 0:
+                print("You can't make any move. Switching back to the computer.")
+                turn = next_turn(turn)
+                continue
+
             exit_verdict = False
             while True:
                 try:
@@ -339,10 +362,16 @@ def play_game(algo_type, depth, player_character):
                 except Exception as e:
                     print('Invalid row or column. Try again.')
 
-            print('Nive move! The board looks like this:')
+            print('Nice move! The board looks like this:')
             print(board)
         #  Let the AI show his skils
         else:
+            next_states = generate_next_states(board, turn)
+            if len(next_states) == 0:
+                print("The computer can't make any moves. It's your turn again!")
+                turn = next_turn(turn)
+                continue
+
             t0 = time.time()
             board = get_next_state(board, algo_type, depth, turn)
             t1 = time.time()
