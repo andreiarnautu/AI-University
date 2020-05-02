@@ -310,8 +310,12 @@ def play_game(algo_type, depth, player_character):
     board = Board()
     turn = 'n'
 
+    t_game_start = time.time()
     print('Game started! Initial board:')
     print(board)
+
+    player_moves = 0
+    ai_moves = 0
 
     while is_final_configuration(board, turn) is False:
         #  Let the player make his move
@@ -323,6 +327,7 @@ def play_game(algo_type, depth, player_character):
                 turn = next_turn(turn)
                 continue
 
+            player_moves += 1
             exit_verdict = False
             while True:
                 try:
@@ -345,6 +350,7 @@ def play_game(algo_type, depth, player_character):
             column = None
             print('Pick your move!')
 
+            t0 = time.time()
             while True:
                 try:
                     row = int(input('Line = '))
@@ -362,7 +368,9 @@ def play_game(algo_type, depth, player_character):
                 except Exception as e:
                     print('Invalid row or column. Try again.')
 
-            print('Nice move! The board looks like this:')
+            t1 = time.time()
+            thinking_time = int(1000 * (t1 - t0))
+            print('Nice move! You thought for ' + str(thinking_time) + ' ms. The board looks like this:')
             print(board)
         #  Let the AI show his skils
         else:
@@ -372,6 +380,7 @@ def play_game(algo_type, depth, player_character):
                 turn = next_turn(turn)
                 continue
 
+            ai_moves += 1
             t0 = time.time()
             board = get_next_state(board, algo_type, depth, turn)
             t1 = time.time()
@@ -400,6 +409,13 @@ def play_game(algo_type, depth, player_character):
         print('The game ended in a draw!')
     else:
         print('Congratulations! You won!')
+
+    print('You made ' + str(player_moves) + ' moves.')
+    print('The computer made ' + str(ai_moves) + ' moves.')
+    t_game_final = time.time()
+    t_game = int(t_game_final - t_game_start)
+    print('The game took ' + str(t_game // 60) + ' minutes and ' + str(t_game % 60) + ' seconds.')
+
     print(board)
 
 
